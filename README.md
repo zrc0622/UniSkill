@@ -1,3 +1,61 @@
+# Source
+source /mnt/mnt/public/fangzhirui/miniconda/bin/activate
+conda activate uniskill
+
+/mnt/mnt/public/fangzhirui/miniconda/envs/uniskill/bin/python
+
+# Install
+1. conda create -n uniskill python=3.11
+2. pip install torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 --index-url https://download.pytorch.org/whl/cu121
+3. pip install https://ghfast.top/github.com/Dao-AILab/flash-attention/releases/download/v2.7.3/flash_attn-2.7.3+cu12torch2.3cxx11abiFALSE-cp311-cp311-linux_x86_64.whl
+4. pip install -r requirements.txt
+
+
+# Train
+``` bash
+cd diffusion
+
+export HF_ENDPOINT=https://hf-mirror.com
+export HF_HOME=workspace/pretrained_models # 无法联网，得先下载
+
+python train_uniskill.py \
+    --do_classifier_free_guidance \
+    --pretrained_model_name_or_path workspace/pretrained_models/instruct-pix2pix \
+    --allow_tf32 \
+    --train_batch_size 32 \
+    --dataset_name libero_hdf5 \
+    --output_dir workspace/outputs \
+    --num_train_epochs 50 \
+    --report_name 1 \
+    --learning_rate 1e-4 \
+    --validation_steps 50
+
+python train_uniskill.py \
+    --do_classifier_free_guidance \
+    --pretrained_model_name_or_path workspace/pretrained_models/instruct-pix2pix \
+    --allow_tf32 \
+    --train_batch_size 32 \
+    --dataset_name sthsthv2_webm \
+    --output_dir workspace/outputs \
+    --num_train_epochs 50 \
+    --report_name 1 \
+    --learning_rate 1e-4 \
+    --validation_steps 50
+
+python train_uniskill.py \
+    --do_classifier_free_guidance \
+    --pretrained_model_name_or_path workspace/pretrained_models/instruct-pix2pix \
+    --allow_tf32 \
+    --train_batch_size 32 \
+    --dataset_name mini_combined \
+    --output_dir workspace/outputs \
+    --num_train_epochs 50 \
+    --report_name 1 \
+    --learning_rate 1e-4 \
+    --validation_steps 50 \
+    --report_to tensorboard
+```
+
 # UniSkill: Imitating Human Videos via Cross-Embodiment Skill Representations
 
 <!-- ### [Imitating Human Videos via Cross-Embodiment Skill Representations](https://uniskill.github.io)    -->

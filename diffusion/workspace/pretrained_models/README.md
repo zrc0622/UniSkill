@@ -1,0 +1,2 @@
+- [x] Instructpix2pix: `./hfd.sh timbrooks/instruct-pix2pix --hf_username zrc0622 --hf_token {hf_token} --tool aria2c -x 4`
+- [x] FSD & ISD: `./hfd.sh HanjungKim/UniSkill --hf_username zrc0622 --hf_token {hf_token} --tool aria2c -x 4`

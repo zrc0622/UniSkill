@@ -82,7 +82,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="outptus",
+        default="outputs",
         help="The output directory where the model"
         "predictions and checkpoints will be written.",
     )
@@ -570,6 +570,9 @@ def make_dataset(dataset_name, args, depth_processor, train=True):
         "libero": LIBERODataset,
         "bridge": BridgeDataset,
         "combined": CombinedDataset,
+        "mini_combined": MiniCombinedDataset,
+        "libero_hdf5": LIBERODatasetHDF5,
+        "sthsthv2_webm": SthSthv2DatasetWEBM,
     }
 
     dataset_class = dataset_classes.get(dataset_name)
@@ -589,6 +592,13 @@ def make_dataset(dataset_name, args, depth_processor, train=True):
             resolution=args.resolution,
             depth_processor=depth_processor,
             unseen_type="human",
+        )
+    elif dataset_name == "mini_combined":
+        return dataset_class(
+            train=train,
+            resolution=args.resolution,
+            depth_processor=depth_processor,
+            datasets=["sthsthv2_webm", "libero_hdf5"],
         )
     else:
         return dataset_class(
@@ -626,6 +636,7 @@ def collate_fn(examples):
     }
 
 def main(args):
+    args.output_dir = os.path.join(args.output_dir, f'{args.dataset_name}/{args.report_name}')
     logging_dir = Path(args.output_dir, args.logging_dir)
 
     accelerator_project_config = ProjectConfiguration(
@@ -683,6 +694,8 @@ def main(args):
         schduler_cls = DDIMScheduler
     else:
         raise ValueError(f"Scheduler {args.train_scheduler} not supported.")
+    
+    # 从预训练 InstructPix2Pix 中加载 噪声调度器、tokenizer、text_encoder、vae、unet
     noise_scheduler = schduler_cls.from_pretrained(
         args.pretrained_model_name_or_path, subfolder="scheduler"
     )
@@ -708,6 +721,7 @@ def main(args):
         variant=args.variant,
     )
 
+    # 加载深度估计器和处理器
     depth_estimator = AutoModelForDepthEstimation.from_pretrained("depth-anything/Depth-Anything-V2-Small-hf")
     depth_processor = AutoImageProcessor.from_pretrained("depth-anything/Depth-Anything-V2-Small-hf")
 
@@ -718,6 +732,7 @@ def main(args):
         variant=args.variant,
     )
     
+    # 初始化ISDM（逆技能动力学模型）
     idm = IDM(
         num_layers=8,
         num_heads=4,
@@ -771,6 +786,7 @@ def main(args):
         accelerator.register_save_state_pre_hook(save_model_hook)
         accelerator.register_load_state_pre_hook(load_model_hook)
 
+    # freeze参数：vae、text_encoder、深度估计器
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
     depth_estimator.requires_grad_(False)
@@ -820,6 +836,7 @@ def main(args):
     else:
         optimizer_class = torch.optim.AdamW
 
+    # 可训练参数：UNet、IDM
     # Optimizer creation
     params_to_optimize = list(unet.parameters()) + list(idm.parameters())
     optimizer = optimizer_class(
@@ -830,6 +847,7 @@ def main(args):
         eps=args.adam_epsilon,
     )
 
+    # 创建训练集和验证集
     # Train dataloader
     train_dataset = make_dataset(args.dataset_name, args, depth_processor, train=True)
     train_dataloader = torch.utils.data.DataLoader(
@@ -893,6 +911,8 @@ def main(args):
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
+        if args.report_to == 'wandb':
+            wandb.login(key='89997f785a384f69f8104add6e516bbf97c1d69b')
         tracker_config = dict(vars(args))
         
         accelerator.init_trackers(
@@ -901,6 +921,7 @@ def main(args):
             init_kwargs={"wandb": {"name": f'{args.dataset_name}/{args.report_name}'}},
         )
 
+    # 训练循环
     # Train!
     total_batch_size = (
         args.train_batch_size
@@ -970,6 +991,8 @@ def main(args):
     for epoch in range(first_epoch, args.num_train_epochs):
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate([unet, idm]):
+                # 目标图像通过 vae encoder 到隐空间并采样（vae encoder 输出的是均值和方差）
+                # 初始图像通过 vae encoder 到隐空间，直接选用均值不采样
                 # Data augmentation
                 latents = vae.encode(
                     batch["next_images"].to(dtype=weight_dtype)
@@ -991,10 +1014,12 @@ def main(args):
                 )
                 timesteps = timesteps.long()
 
+                # 选一个时间步，对目标图像加噪，目标图像（t=0）
                 # Add noise to the latents
                 # according to the noise magnitude at each timestep
                 # (this is the forward diffusion process)
-                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+                # add_noise是一步加噪，其数学原理为：由于高斯分布的特性，t次独立加噪的结果等价于对原始图像进行一次等效加噪，即公式 x_t = sqrt(ᾱ_t) * x_0 + sqrt(1 - ᾱ_t) * ε
+                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps) # 噪声图像（t=timesteps）
 
                 depth_features = torch.cat([
                     batch["curr_depth_features"].to(dtype=weight_dtype),
@@ -1014,8 +1039,10 @@ def main(args):
                     batch["idm_next_images"].to(dtype=weight_dtype)
                 ], dim=1)
                 
+                # idm以 初始图像、初始深度图、目标图像、目标深度图 为输入，输出 skill_embedding
                 latent_action = idm(depth_pair, visual_pair)
                 
+                # 以一定概率将输入给unet（InstructPix2Pix）的 初始图像和skill_embedding 置为0，提高模型的无条件预测能力
                 prompt_mask = None
                 if args.do_classifier_free_guidance:
                     random_p = torch.rand(
@@ -1034,6 +1061,7 @@ def main(args):
                 prompt_embeds = latent_action
                 concatenated_latents = torch.cat([noisy_latents, curr_latents], dim=1)
 
+                # unet 输入噪声、初始图像、skill_embedding、时间步，输出噪声，起到 fsd 的作用
                 # Predict the noise residual
                 model_pred = unet(
                     concatenated_latents,
@@ -1051,6 +1079,7 @@ def main(args):
                         f"Unknown prediction type \
                             {noise_scheduler.config.prediction_type}"
                     )
+                # 损失计算
                 loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
                 accelerator.backward(loss)

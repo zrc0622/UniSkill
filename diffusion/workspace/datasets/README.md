@@ -1,0 +1,5 @@
+- [x] Something-Something-v2 (19G, 已确认, 220847): https://www.qualcomm.com/developer/software/something-something-v-2-dataset/downloads
+- [ ] H2O (~ 1.0TB): https://github.com/taeinkwon/h2odataset?tab=readme-ov-file
+- [ ] DROID (1.7TB): https://github.com/droid-dataset/droid_policy_learning
+- [x] LIBERO (100GB, 已确认, 6500): `./hfd.sh yifengzhu-hf/LIBERO-datasets --dataset --tool aria2c -x 4`
+- [ ] Bridge-v2 (450GB): https://opendatalab.com/OpenDataLab/BridgeData_V2/tree/main

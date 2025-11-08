@@ -54,6 +54,7 @@ class BaseDataset(TorchDataset):
             
         self._prepare_data(data_path)
         
+    # 读取样本，将视频路径和长度存到 self.image_pair
     def _prepare_data(self, data_path):
         with open(os.path.join(data_path, "metadata.json"), "r") as f:
             metadata = json.load(f)
@@ -87,6 +88,7 @@ class BaseDataset(TorchDataset):
     def __len__(self):
         return len(self.image_pair)
     
+    # 返回两帧，用于训练。其中输入fdm和深度估计器的低分辨率，输入idm的高分辨率
     def __getitem__(self, idx):
         image_pair = self.image_pair[idx]
 

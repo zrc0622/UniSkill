@@ -1,3 +1,14 @@
+diffusion/workspace/pretrained_models/*
+!diffusion/workspace/pretrained_models/hfd.sh
+!diffusion/workspace/pretrained_models/README.md
+
+diffusion/workspace/outputs
+
+diffusion/workspace/datasets/*
+!diffusion/workspace/datasets/hfd.sh
+!diffusion/workspace/datasets/README.md
+!diffusion/workspace/datasets/test.ipynb
+
 # Logging
 logs
 tmp
