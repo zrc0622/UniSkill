@@ -4,10 +4,10 @@ diffusion/workspace/pretrained_models/*
 
 diffusion/workspace/outputs
 
-diffusion/workspace/datasets/*
-!diffusion/workspace/datasets/hfd.sh
-!diffusion/workspace/datasets/README.md
-!diffusion/workspace/datasets/test.ipynb
+diffusion/workspace/datasets/LIBER0
+diffusion/workspace/datasets/ststv2/*
+!diffusion/workspace/datasets/ststv2/fix_video.py
+!diffusion/workspace/datasets/ststv2/generate_fix_metadata.py
 
 # Logging
 logs
