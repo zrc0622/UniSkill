@@ -5,9 +5,14 @@ diffusion/workspace/pretrained_models/*
 diffusion/workspace/outputs
 
 diffusion/workspace/datasets/LIBER0
+
 diffusion/workspace/datasets/ststv2/*
 !diffusion/workspace/datasets/ststv2/fix_video.py
 !diffusion/workspace/datasets/ststv2/generate_fix_metadata.py
+
+diffusion/workspace/datasets/BridgeDataV2/*
+!diffusion/workspace/datasets/BridgeDataV2/generate_metadata.py
+!diffusion/workspace/datasets/BridgeDataV2/convert_to_video.py
 
 # Logging
 logs

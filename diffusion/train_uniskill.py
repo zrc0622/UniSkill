@@ -415,6 +415,7 @@ def log_validation(
     weight_dtype,
     unet,
     idm,
+    global_step,
 ):
     logger.info("Running validation... ")
     
@@ -522,42 +523,54 @@ def log_validation(
             }
         )
     
-    for tracker in accelerator.trackers:
-        formatted_images = []
-        formatted_errors = []
+        mse_errors = [log["mse"] for log in image_logs]
+        if not mse_errors:
+            return image_logs
+            
+        mean_mse = np.mean(mse_errors)
 
-        mse_errors = []
-        for log in image_logs:
-            images = log["images"]
-            noisy_images = log["noisy_images"]
-            errors = log["errors"]
-            validation_image = log["validation_image"]
-            gt_image = log["gt_image"]
-            mse = log["mse"]
+        for tracker in accelerator.trackers:
 
-            mse_errors.append(mse)
+            if "tensorboard" in tracker.name:
+                tracker.writer.add_scalar("val_mse", mean_mse, global_step)
 
-            formatted_images.append(
-                wandb.Image(validation_image, caption="Conditioning Image")
-            )
-            formatted_images.append(
-                wandb.Image(gt_image, caption="Ground Truth Target")
-            )
+                if global_step > 0 and global_step % 500 == 0:
+                    from torchvision.utils import make_grid
+                    
+                    for i, log in enumerate(image_logs):
+                        to_tensor = lambda x: torch.tensor(np.array(x)).permute(2, 0, 1) / 255.0
 
-            for image in images:
-                image = wandb.Image(image, caption="Generated Image")
-                formatted_images.append(image)
+                        all_images_list = [
+                            to_tensor(log["validation_image"]), to_tensor(log["gt_image"])
+                        ] + [to_tensor(img) for img in log["images"]] + [to_tensor(img) for img in log["noisy_images"]]
+                        image_grid = make_grid(all_images_list, nrow=4, normalize=True)
+                        tracker.writer.add_image(f"Validation/{i}/Images", image_grid, global_step)
+                        
+                        if log["errors"]:
+                            errors_tensors = [torch.tensor(err).permute(2, 0, 1) for err in log["errors"]]
+                            error_grid = make_grid(errors_tensors, nrow=len(log["errors"]), normalize=True)
+                            tracker.writer.add_image(f"Validation/{i}/Errors", error_grid, global_step)
 
-            for noisy_image in noisy_images:
-                noisy_image = wandb.Image(noisy_image, caption="Noisy Generated Image")
-                formatted_images.append(noisy_image)
+            if "wandb" in tracker.name:
+                wandb_log_data = {
+                    "val_mse": mean_mse
+                }
 
-            for error in errors:
-                error = wandb.Image(error, caption="Normalized MSE")
-                formatted_errors.append(error)
+                if global_step > 0 and global_step % 500 == 0:
+                    formatted_images = []
+                    for log in image_logs:
+                        formatted_images.append(wandb.Image(log["validation_image"], caption="Conditioning Image"))
+                        formatted_images.append(wandb.Image(log["gt_image"], caption="Ground Truth Target"))
+                        for image in log["images"]:
+                            formatted_images.append(wandb.Image(image, caption="Generated Image"))
+                        for noisy_image in log["noisy_images"]:
+                            formatted_images.append(wandb.Image(noisy_image, caption="Noisy Generated Image"))
+                        for error in log["errors"]:
+                            formatted_images.append(wandb.Image(error, caption="Normalized MSE"))
+                    
+                    wandb_log_data["validation"] = formatted_images
 
-        tracker.log({"validation": formatted_images})
-        tracker.log({"val_mse": np.mean(mse_errors)})
+                tracker.log(wandb_log_data, step=global_step)
 
         return image_logs
 
@@ -573,6 +586,7 @@ def make_dataset(dataset_name, args, depth_processor, train=True):
         "mini_combined": MiniCombinedDataset,
         "libero_hdf5": LIBERODatasetHDF5,
         "sthsthv2_webm": SthSthv2DatasetWEBM,
+        "bridge_video": BridgeDatasetVIDEO,
     }
 
     dataset_class = dataset_classes.get(dataset_name)
@@ -1152,6 +1166,7 @@ def main(args):
                             weight_dtype,
                             unet,
                             idm,
+                            global_step,
                         )
 
             logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}

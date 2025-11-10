@@ -6,6 +6,7 @@ from .h2o_dataset import H2ODataset
 from .bridge_dataset import BridgeDataset
 from .libero_dataset_hdf5 import LIBERODatasetHDF5
 from .sthsthv2_webm import SthSthv2DatasetWEBM
+from .bridge_dataset_video import BridgeDatasetVIDEO
 from .mini_combined_dataset import MiniCombinedDataset
 
 from .combined_dataset import CombinedDataset

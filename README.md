@@ -1,3 +1,6 @@
+# 环境补充
+pip install rlds[tensorflow]
+
 # Source
 source /mnt/mnt/public/fangzhirui/miniconda/bin/activate
 conda activate uniskill
@@ -17,6 +20,7 @@ cd diffusion
 
 export HF_ENDPOINT=https://hf-mirror.com
 export HF_HOME=workspace/pretrained_models # 无法联网，得先下载
+export TORCH_HOME=workspace/pretrained_models
 
 python train_uniskill.py \
     --do_classifier_free_guidance \
@@ -28,7 +32,8 @@ python train_uniskill.py \
     --num_train_epochs 50 \
     --report_name 1 \
     --learning_rate 1e-4 \
-    --validation_steps 50
+    --validation_steps 50 \
+    --report_to tensorboard
 
 python train_uniskill.py \
     --do_classifier_free_guidance \
@@ -40,7 +45,21 @@ python train_uniskill.py \
     --num_train_epochs 50 \
     --report_name 1 \
     --learning_rate 1e-4 \
-    --validation_steps 50
+    --validation_steps 50 \
+    --report_to tensorboard
+
+python train_uniskill.py \
+    --do_classifier_free_guidance \
+    --pretrained_model_name_or_path workspace/pretrained_models/instruct-pix2pix \
+    --allow_tf32 \
+    --train_batch_size 32 \
+    --dataset_name bridge_video \
+    --output_dir workspace/outputs \
+    --num_train_epochs 50 \
+    --report_name 1 \
+    --learning_rate 1e-4 \
+    --validation_steps 50 \
+    --report_to tensorboard
 
 python train_uniskill.py \
     --do_classifier_free_guidance \
